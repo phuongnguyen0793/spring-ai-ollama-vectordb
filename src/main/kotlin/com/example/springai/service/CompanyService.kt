@@ -20,14 +20,42 @@ class CompanyService(
         return mapOf("companyName" to name, "valid" to valid, "reasons" to reasons)
     }
 
-    fun searchSimilarPurposes(purposeText: String, limit: Int): List<PurposeResult> {
+    /**
+     * Search for similar purposes using vector embeddings.
+     * 
+     * @param purposeText The text to search for
+     * @param topK Maximum number of results to return (default: 5)
+     * @param threshold Maximum distance to include in results (default: 0.5)
+     *                  Lower values = more similar. Range: 0.0 (identical) to 2.0 (completely different)
+     * @return List of similar purposes sorted by distance (most similar first)
+     */
+    fun searchSimilarPurposes(
+        purposeText: String,
+        topK: Int = 5,
+        threshold: Double = 0.5
+    ): List<PurposeResult> {
         val embedding = ollamaClient.embed(purposeText)
         // convert float array to comma separated string
         val vecStr = embedding.joinToString(",")
-        // pgvector similarity: '<->' operator expects a vector literal syntax like '[x,y,...]'
-        val sql = "SELECT id, purpose_text, (embedding <-> ('[" + vecStr + "]')::vector) as distance FROM purposes ORDER BY distance ASC LIMIT ?"
-        val mapper = RowMapper { rs, _ -> PurposeResult(rs.getLong("id"), rs.getString("purpose_text"), rs.getDouble("distance")) }
-        val rows = jdbc.query(sql, arrayOf(limit), mapper)
-        return rows
+        
+        // pgvector similarity: '<->' operator returns L2 distance
+        // Distance values: 0.0 = identical, larger values = more different
+        val sql = """
+            SELECT id, purpose_text, (embedding <-> ('[${vecStr}]')::vector) as distance 
+            FROM purposes 
+            WHERE embedding <-> ('[${vecStr}]')::vector <= ? 
+            ORDER BY distance ASC 
+            LIMIT ?
+        """.trimIndent()
+        
+        val mapper = RowMapper { rs, _ -> 
+            PurposeResult(
+                rs.getLong("id"), 
+                rs.getString("purpose_text"), 
+                rs.getDouble("distance")
+            ) 
+        }
+        
+        return jdbc.query(sql, arrayOf(threshold, topK), mapper)
     }
 }

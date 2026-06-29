@@ -18,7 +18,19 @@ class CompanyController(private val companyService: CompanyService) {
 
     @PostMapping("/search-purpose")
     fun searchPurpose(@RequestBody req: PurposeRequest): ResponseEntity<Any> {
-        val results = companyService.searchSimilarPurposes(req.purpose, 5)
-        return ResponseEntity.ok(results)
+        val results = companyService.searchSimilarPurposes(
+            purposeText = req.purpose,
+            topK = req.topK ?: 5,
+            threshold = req.threshold ?: 0.5
+        )
+        return ResponseEntity.ok(
+            mapOf(
+                "query" to req.purpose,
+                "topK" to (req.topK ?: 5),
+                "threshold" to (req.threshold ?: 0.5),
+                "results" to results,
+                "count" to results.size
+            )
+        )
     }
 }

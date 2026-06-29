@@ -4,9 +4,12 @@ import com.example.springai.integration.OllamaClient
 import org.springframework.boot.CommandLineRunner
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Component
+import org.slf4j.LoggerFactory
 
 @Component
 class StartupEmbeddingInitializer(private val jdbc: JdbcTemplate, private val ollama: OllamaClient) : CommandLineRunner {
+    private val logger = LoggerFactory.getLogger(javaClass)
+    
     override fun run(vararg args: String?) {
         val rows = jdbc.queryForList("SELECT id, purpose_text FROM purposes WHERE embedding IS NULL")
         for (r in rows) {
@@ -18,7 +21,7 @@ class StartupEmbeddingInitializer(private val jdbc: JdbcTemplate, private val ol
                 val sql = "UPDATE purposes SET embedding = ('[" + vec + "]')::vector WHERE id = ?"
                 jdbc.update(sql, id.toLong())
             } catch (e: Exception) {
-                println("Failed to compute embedding for id=${'$'}id: ${'$'}{e.message}")
+                logger.error("Failed to compute embedding for id=$id", e)
             }
         }
     }

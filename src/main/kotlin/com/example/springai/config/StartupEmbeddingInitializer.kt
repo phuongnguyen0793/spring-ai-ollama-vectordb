@@ -1,28 +1,36 @@
 package com.example.springai.config
 
-import com.example.springai.integration.OllamaClient
-import org.springframework.boot.CommandLineRunner
-import org.springframework.jdbc.core.JdbcTemplate
-import org.springframework.stereotype.Component
 import org.slf4j.LoggerFactory
+import org.springframework.ai.document.Document
+import org.springframework.ai.vectorstore.SearchRequest
+import org.springframework.ai.vectorstore.VectorStore
+import org.springframework.boot.CommandLineRunner
+import org.springframework.stereotype.Component
 
 @Component
-class StartupEmbeddingInitializer(private val jdbc: JdbcTemplate, private val ollama: OllamaClient) : CommandLineRunner {
+class StartupEmbeddingInitializer(private val vectorStore: VectorStore) : CommandLineRunner {
+
     private val logger = LoggerFactory.getLogger(javaClass)
-    
+
+    private val samplePurposes = listOf(
+        "Provide cloud-native payments infrastructure",
+        "Develop AI-powered healthcare diagnostics",
+        "Offer e-commerce platform for small retailers",
+        "Create mobile games for casual players",
+        "Consulting for digital transformation"
+    )
+
     override fun run(vararg args: String?) {
-        val rows = jdbc.queryForList("SELECT id, purpose_text FROM purposes WHERE embedding IS NULL")
-        for (r in rows) {
-            val id = r["id"] as Number
-            val text = r["purpose_text"] as String
-            try {
-                val emb = ollama.embed(text)
-                val vec = emb.joinToString(",")
-                val sql = "UPDATE purposes SET embedding = ('[" + vec + "]')::vector WHERE id = ?"
-                jdbc.update(sql, id.toLong())
-            } catch (e: Exception) {
-                logger.error("Failed to compute embedding for id=$id", e)
-            }
+        val probe = vectorStore.similaritySearch(
+            SearchRequest.builder().query("cloud payments").topK(1).similarityThreshold(0.0).build()
+        )
+        if (!probe.isNullOrEmpty()) {
+            logger.info("Vector store already seeded — skipping initialization")
+            return
         }
+        logger.info("Seeding vector store with ${samplePurposes.size} sample purposes...")
+        val documents = samplePurposes.map { purpose -> Document(purpose) }
+        vectorStore.add(documents)
+        logger.info("Vector store seeded successfully")
     }
 }

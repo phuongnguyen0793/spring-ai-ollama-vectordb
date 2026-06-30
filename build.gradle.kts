@@ -11,16 +11,25 @@ group = "com.example"
 version = "0.1.0"
 java.sourceCompatibility = JavaVersion.VERSION_21
 
-repositories { mavenCentral() }
+repositories {
+    mavenCentral()
+    maven("https://repo.spring.io/milestone")
+}
+
+extra["springAiVersion"] = "1.0.0"
+
+dependencyManagement {
+    imports {
+        mavenBom("org.springframework.ai:spring-ai-bom:${property("springAiVersion")}")
+    }
+}
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
-    implementation("org.springframework.boot:spring-boot-starter-jdbc")
-    implementation("org.postgresql:postgresql:42.6.0")
-    implementation("org.flywaydb:flyway-core:9.22.3")
+    implementation("org.springframework.ai:spring-ai-ollama-spring-boot-starter")
+    implementation("org.springframework.ai:spring-ai-opensearch-store-spring-boot-starter")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.1")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
 
